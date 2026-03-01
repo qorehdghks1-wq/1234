@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>이미지 기반 턴제 격투 게임 - 확장판</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background: #111; color: #fff; text-align: center; margin: 0; overflow-x: hidden; touch-action: manipulation; }
+        
+        .screen { display: none; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+        .active { display: block; }
+
+        /* --- 1. 캐릭터 선택 화면 --- */
+        #select-screen { background: linear-gradient(to bottom, #222, #000); padding-top: 30px; height: 100vh; overflow-y: auto; }
+        .char-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 900px; margin: 20px auto; padding: 0 20px 50px; }
+        .char-card { border: 4px solid #555; border-radius: 10px; cursor: pointer; transition: 0.3s; padding: 10px; background: #333; }
+        .char-card:hover { transform: scale(1.05); border-color: #f1c40f; box-shadow: 0 0 15px #f1c40f; z-index: 10; }
+        .char-card img { width: 100%; height: 180px; object-fit: cover; border-radius: 5px; background: #222; }
+        .char-card h3 { margin: 10px 0 5px; color: #f1c40f; font-size: 1.1em; }
+        .char-card p { font-size: 0.85em; color: #ccc; margin: 3px 0; }
+
+        /* --- 2. 전투 화면 --- */
+        #battle-screen { background-image: url('images/battle_bg.png'); background-size: cover; background-position: center; }
+        
+        .battle-layout { display: flex; justify-content: space-between; align-items: flex-end; height: 55%; padding: 0 50px 20px; }
+        .char-display { text-align: center; width: 200px; }
+        .char-display h3 { background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px; margin-bottom: 5px; font-size: 1.1em; }
+        
+        .hp-bar-bg { width: 100%; height: 20px; background: #444; border: 2px solid #000; border-radius: 5px; overflow: hidden; margin-top: 10px; }
+        .hp-bar-fill { height: 100%; background: #e74c3c; width: 100%; transition: width 0.3s; }
+        .combo-text { font-size: 0.8em; font-weight: bold; color: #f1c40f; margin-top: 5px; background: rgba(0,0,0,0.6); border-radius: 5px; padding: 3px; }
+
+        .char-img { width: 100%; height: 200px; object-fit: contain; transition: transform 0.2s; filter: drop-shadow(5px 5px 5px rgba(0,0,0,0.8)); }
+        
+        /* 애니메이션 */
+        @keyframes shake { 0% { transform: translate(5px, 5px); } 50% { transform: translate(-5px, -5px); } 100% { transform: translate(5px, -5px); } }
+        .damaged { animation: shake 0.3s; animation-iteration-count: 2; filter: brightness(2) sepia(1) hue-rotate(-50deg) drop-shadow(0 0 10px red); }
+        .attacking-p { transform: translateX(40px) scale(1.1); }
+        .attacking-e { transform: translateX(-40px) scale(1.1); }
+        .ultimate-attack { filter: brightness(1.5) drop-shadow(0 0 20px #9b59b6); transform: scale(1.2); z-index: 100; position: relative; }
+
+        /* 하단 컨트롤러 */
+        #controls { height: 45%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; border-top: 4px solid #555; padding: 0 10px; }
+        #combat-log { font-size: 1.1em; color: #ddd; margin-bottom: 15px; height: 50px; font-weight: bold; line-height: 1.3; }
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 500px; }
+        button { padding: 12px 10px; font-size: 1em; cursor: pointer; border: 3px solid transparent; border-radius: 8px; font-weight: bold; transition: 0.2s; flex: 1 1 30%; }
+        button:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(255,255,255,0.3); }
+        
+        .btn-atk { background: #e74c3c; color: white; border-color: #c0392b; }
+        .btn-grd { background: #3498db; color: white; border-color: #2980b9; }
+        .btn-thr { background: #f1c40f; color: black; border-color: #f39c12; }
+        .btn-ult { background: #9b59b6; color: white; border-color: #8e44ad; box-shadow: 0 0 10px #9b59b6; flex: 1 1 100%; margin-top: 5px; }
+        
+        button:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(100%); box-shadow: none; transform: none; }
+
+        /* ========================================= */
+        /* 📱 모바일 전용 반응형 디자인 (화면이 768px 이하일 때 발동) */
+        /* ========================================= */
+        @media (max-width: 768px) {
+            #select-screen h1 { font-size: 1.5em; margin-bottom: 10px; }
+            .char-container { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 10px; }
+            .char-card img { height: 120px; }
+            
+            .battle-layout { padding: 0 10px 10px; height: 50%; }
+            .char-display { width: 42%; }
+            .char-display h3 { font-size: 0.9em; }
+            .char-img { height: 140px; }
+            h1 { font-size: 2.5em !important; } /* VS 아이콘 축소 */
+            
+            #controls { height: 50%; padding: 10px; }
+            #combat-log { font-size: 0.95em; height: 60px; }
+            button { padding: 15px 5px; font-size: 0.9em; border-width: 2px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="select-screen" class="screen active">
+        <h1>캐릭터를 선택하세요</h1>
+        <div class="char-container">
+            <div class="char-card" onclick="selectCharacter('warrior')">
+                <img src="images/warrior.png" alt="화염 전사">
+                <h3>화염 전사</h3><p>기본 데미지 강력</p>
+            </div>
+            <div class="char-card" onclick="selectCharacter('knight')">
+                <img src="images/knight.png" alt="강철 기사">
+                <h3>강철 기사</h3><p>방어 시 반사 데미지</p>
+            </div>
+            <div class="char-card" onclick="selectCharacter('assassin')">
+                <img src="images/assassin.png" alt="암살자" onerror="this.src='https://via.placeholder.com/200?text=Assassin'">
+                <h3>그림자 암살자</h3><p>공격력 최상, 낮은 체력</p>
+            </div>
+            <div class="char-card" onclick="selectCharacter('mage')">
+                <img src="images/mage.png" alt="마법사" onerror="this.src='https://via.placeholder.com/200?text=Mage'">
+                <h3>빛의 대마법사</h3><p>특수 방어막 보유</p>
+            </div>
+            <div class="char-card" onclick="selectCharacter('brawler')">
+                <img src="images/brawler.png" alt="무투가" onerror="this.src='https://via.placeholder.com/200?text=Brawler'">
+                <h3>열혈 무투가</h3><p>잡기 기술 특화</p>
+            </div>
+            <div class="char-card" onclick="selectCharacter('paladin')">
+                <img src="images/paladin.png" alt="성기사" onerror="this.src='https://via.placeholder.com/200?text=Paladin'">
+                <h3>신성 성기사</h3><p>압도적인 최대 체력</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="battle-screen" class="screen">
+        <div class="battle-layout">
+            <div class="char-display">
+                <h3 id="p-name">플레이어</h3>
+                <img id="p-img" class="char-img" src="" alt="플레이어">
+                <div class="hp-bar-bg"><div id="p-hp-fill" class="hp-bar-fill"></div></div>
+                <div id="p-combo" class="combo-text">연속 공격: 0 / 3</div>
+            </div>
+
+            <h1 style="font-size: 4em; color: #f1c40f; text-shadow: 2px 2px 5px #000;">VS</h1>
+
+            <div class="char-display">
+                <h3 id="e-name">컴퓨터</h3>
+                <img id="e-img" class="char-img" src="" alt="적">
+                <div class="hp-bar-bg"><div id="e-hp-fill" class="hp-bar-fill"></div></div>
+                <div id="e-combo" class="combo-text">연속 공격: 0 / 3</div>
+            </div>
+        </div>
+
+        <div id="controls">
+            <div id="combat-log">전투 시작! 행동을 선택하세요.</div>
+            <div class="btn-group">
+                <button class="btn-atk" id="btn-atk" onclick="playTurn('공격')">공격</button>
+                <button class="btn-grd" id="btn-grd" onclick="playTurn('방어')">방어</button>
+                <button class="btn-thr" id="btn-thr" onclick="playTurn('잡기')">잡기</button>
+                <button class="btn-ult" id="btn-ult" onclick="playTurn('필살기')" disabled>🔥 필살기 (연속 공격 0/3)</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const charData = {
+            warrior: { name: "화염 전사", hp: 100, maxHp: 100, sprite: "images/warrior.png", atkBonus: 5, refBonus: 0 },
+            knight: { name: "강철 기사", hp: 100, maxHp: 100, sprite: "images/knight.png", atkBonus: 0, refBonus: 5 },
+            assassin: { name: "그림자 암살자", hp: 70, maxHp: 70, sprite: "images/assassin.png", atkBonus: 15, refBonus: 0 },
+            mage: { name: "대마법사", hp: 90, maxHp: 90, sprite: "images/mage.png", atkBonus: 3, refBonus: 2 },
+            brawler: { name: "열혈 무투가", hp: 110, maxHp: 110, sprite: "images/brawler.png", atkBonus: 0, refBonus: 0 },
+            paladin: { name: "신성 성기사", hp: 130, maxHp: 130, sprite: "images/paladin.png", atkBonus: -5, refBonus: 3 }
+        };
+
+        let player = {};
+        let enemy = {};
+        let pCombo = 0;
+        let eCombo = 0;
+        const baseDamage = 15;
+        let isPlayerTurn = true;
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function selectCharacter(charId) {
+            player = JSON.parse(JSON.stringify(charData[charId]));
+            const enemyIds = Object.keys(charData).filter(id => id !== charId);
+            const randomEnemyId = enemyIds[Math.floor(Math.random() * enemyIds.length)];
+            enemy = JSON.parse(JSON.stringify(charData[randomEnemyId]));
+            enemy.name = "타락한 " + enemy.name;
+
+            pCombo = 0; eCombo = 0;
+
+            document.getElementById('p-name').innerText = player.name;
+            document.getElementById('p-img').src = player.sprite;
+            document.getElementById('e-name').innerText = enemy.name;
+            document.getElementById('e-img').src = enemy.sprite;
+            
+            updateUI();
+            showScreen('battle-screen');
+            log("전투가 시작되었습니다!<br>기술을 선택하세요.");
+        }
+
+        function updateUI() {
+            document.getElementById('p-hp-fill').style.width = (player.hp / player.maxHp * 100) + '%';
+            document.getElementById('e-hp-fill').style.width = (enemy.hp / enemy.maxHp * 100) + '%';
+            
+            document.getElementById('p-combo').innerText = `연속 공격: ${pCombo} / 3`;
+            document.getElementById('e-combo').innerText = `연속 공격: ${eCombo} / 3`;
+
+            const ultBtn = document.getElementById('btn-ult');
+            if (pCombo >= 3) {
+                ultBtn.disabled = false;
+                ultBtn.innerText = "🔥 궁극의 필살기 발동!! 🔥";
+            } else {
+                ultBtn.disabled = true;
+                ultBtn.innerText = `🔥 필살기 (연속 공격 ${pCombo}/3)`;
+            }
+        }
+
+        function log(msg) { document.getElementById('combat-log').innerHTML = msg; }
+
+        function triggerVisual(target, effectClass) {
+            const element = document.getElementById(target + '-img');
+            element.classList.add(effectClass);
+            setTimeout(() => element.classList.remove(effectClass), 500);
+        }
+
+        function setButtons(enable) {
+            document.getElementById('btn-atk').disabled = !enable;
+            document.getElementById('btn-grd').disabled = !enable;
+            document.getElementById('btn-thr').disabled = !enable;
+            if (enable) updateUI();
+            else document.getElementById('btn-ult').disabled = true;
+        }
+
+        function playTurn(playerAction) {
+            if (!isPlayerTurn || player.hp <= 0 || enemy.hp <= 0) return;
+            setButtons(false);
+
+            let enemyAction;
+            if (eCombo >= 3) enemyAction = '필살기';
+            else {
+                const actions = ['공격', '방어', '잡기'];
+                enemyAction = actions[Math.floor(Math.random() * 3)];
+            }
+            
+            log(`나: [${playerAction}] vs 적: [${enemyAction}]<br>`);
+
+            let pDealsUlt = playerAction === '필살기';
+            let eDealsUlt = enemyAction === '필살기';
+
+            if (pDealsUlt) { pCombo = 0; triggerVisual('p', 'ultimate-attack'); }
+            if (eDealsUlt) { eCombo = 0; triggerVisual('e', 'ultimate-attack'); }
+
+            setTimeout(() => {
+                let msg = "";
+                
+                if (pDealsUlt) {
+                    let ultDmg = Math.floor(enemy.maxHp / 3);
+                    enemy.hp = Math.max(0, enemy.hp - ultDmg);
+                    msg += `<span style="color:#9b59b6">필중! 적에게 ${ultDmg}의 피해!</span><br>`;
+                    triggerVisual('e', 'damaged');
+                }
+                
+                if (eDealsUlt) {
+                    let ultDmg = Math.floor(player.maxHp / 3);
+                    player.hp = Math.max(0, player.hp - ultDmg);
+                    msg += `<span style="color:#e74c3c">적의 필살기! 나에게 ${ultDmg} 피해!</span><br>`;
+                    triggerVisual('p', 'damaged');
+                }
+
+                if (!pDealsUlt && !eDealsUlt) {
+                    if (playerAction === enemyAction) {
+                        msg += "서로의 기술이 무효화되었습니다!";
+                        pCombo = 0; eCombo = 0;
+                    } 
+                    else if ((playerAction === '공격' && enemyAction === '잡기') || (playerAction === '방어' && enemyAction === '공격') || (playerAction === '잡기' && enemyAction === '방어')) {
+                        let dmg = baseDamage + (playerAction === '공격' ? player.atkBonus : 0);
+                        enemy.hp = Math.max(0, enemy.hp - dmg);
+                        msg += `상성 승리! ${dmg}의 피해!`;
+                        triggerVisual('p', 'attacking-p');
+                        triggerVisual('e', 'damaged');
+                        
+                        if (playerAction === '공격') pCombo++; else pCombo = 0;
+                        eCombo = 0;
+                    } 
+                    else {
+                        let dmg = baseDamage + (enemyAction === '공격' ? enemy.atkBonus : 0);
+                        if (playerAction === '방어' && player.refBonus > 0) {
+                            enemy.hp = Math.max(0, enemy.hp - player.refBonus);
+                            msg += `방어 성공! 적에게 ${player.refBonus} 반사 피해!<br>`;
+                            triggerVisual('e', 'damaged');
+                        }
+                        
+                        player.hp = Math.max(0, player.hp - dmg);
+                        if(playerAction !== '방어') msg += `상성 패배! ${dmg}의 피해!`;
+                        triggerVisual('e', 'attacking-e');
+                        triggerVisual('p', 'damaged');
+
+                        if (enemyAction === '공격') eCombo++; else eCombo = 0;
+                        pCombo = 0;
+                    }
+                }
+
+                if (playerAction === '공격' && enemyAction !== '잡기' && !pDealsUlt) pCombo = 0;
+
+                log(msg);
+                updateUI();
+
+                if (enemy.hp <= 0) {
+                    log("<span style='color:#f1c40f;'>🏆 승리하셨습니다!!</span>");
+                } else if (player.hp <= 0) {
+                    log("<span style='color:#e74c3c;'>💀 패배하셨습니다...</span>");
+                } else {
+                    setTimeout(() => {
+                        isPlayerTurn = true;
+                        setButtons(true);
+                        log("다시 당신의 턴입니다.");
+                    }, 1000);
+                }
+            }, 300);
+        }
+    </script>
+</body>
+</html>
